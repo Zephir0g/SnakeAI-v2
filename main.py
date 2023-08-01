@@ -3,6 +3,7 @@ import random
 import numpy as np
 import os
 import pickle
+import matplotlib.pyplot as plt
 
 # define some colors
 WHITE = (255, 255, 255)
@@ -178,19 +179,10 @@ class QLearningAgent:
 def main():
     # create agent only once
     agent = QLearningAgent()
-
-
-    # If you save the Q-table after each training and load it before starting,
-    # the next training, your agent will continue learning from where it left off last time.
-    # This means that over time, the agent will "learn" more and more from each new game experience.
-    try:
-        print("Q-table found. Starting...")
-        agent.load_q_table("q_table.pkl")
-    except FileNotFoundError:
-        print("No Q-table found. Starting from scratch.")
+    scores = []  # list to store scores
 
     # start the learning loop
-    for episode in range(500):   # replace NUM_EPISODES with desired number of learning episodes
+    for episode in range(5000):   # replace NUM_EPISODES with desired number of learning episodes
 
         # reset the game state
         snake = Snake()
@@ -223,9 +215,9 @@ def main():
                 food.randomize_position()
 
             if game_over:
-                if episode % 10 == 0: # print every 10 episodes
+                if episode % 100 == 0: # print every 100 episodes
                     print(f'Episode {episode}, Score: {snake.score}')
-                # Reset score after logging
+                scores.append(snake.score)  # append the score
                 snake.score = 0
 
                 text = FONT.render("Game Over", True, BLACK)
@@ -239,9 +231,14 @@ def main():
             agent.update_q_table(old_state, action, reward, new_state)
 
             pygame.display.update()
-            CLOCK.tick(240)
+            CLOCK.tick(500)
 
-    agent.save_q_table("q_table.pkl")
+    # After the training loop
+    plt.plot(scores)
+    plt.title('Training Scores Over Time')
+    plt.xlabel('Episode')
+    plt.ylabel('Score')
+    plt.show()
 
 
 if __name__ == "__main__":
