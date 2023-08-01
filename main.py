@@ -30,6 +30,15 @@ class Snake:
     def get_head_position(self):
         return self.positions[0]
 
+    def turn(self, new_direction):
+        # Don't allow the snake to move in the opposite direction instantaneously
+        opposing_directions = [(pygame.K_UP, pygame.K_DOWN), (pygame.K_DOWN, pygame.K_UP), (pygame.K_LEFT, pygame.K_RIGHT), (pygame.K_RIGHT, pygame.K_LEFT)]
+        for direction in opposing_directions:
+            if (new_direction == direction[0] and self.direction == direction[1]) or (new_direction == direction[1] and self.direction == direction[0]):
+                return
+
+        self.direction = new_direction
+
     def move(self):
         cur = self.get_head_position()
         if self.direction == pygame.K_UP:
@@ -64,7 +73,8 @@ class Food:
 
 def is_collision(snake):
     head_x, head_y = snake.get_head_position()
-    return head_x < 0 or head_y < 0 or head_x >= WINDOW_WIDTH or head_y >= WINDOW_HEIGHT
+    return (head_x < 0 or head_y < 0 or head_x >= WINDOW_WIDTH or head_y >= WINDOW_HEIGHT or
+            (snake.get_head_position() in snake.positions[1:]))
 
 def main():
     snake = Snake()
@@ -76,7 +86,7 @@ def main():
                 pygame.quit()
                 return
             elif event.type == pygame.KEYDOWN:
-                snake.direction = event.key
+                snake.turn(event.key)
 
         snake.move()
 
@@ -93,11 +103,11 @@ def main():
             text = FONT.render("Game Over", True, BLACK)
             SCREEN.blit(text, (WINDOW_WIDTH//2 - text.get_width()//2, WINDOW_HEIGHT//2 - text.get_height()//2))
             pygame.display.update()
-            pygame.time.wait(3000)  # delay to see game over message
+            pygame.time.wait(200)  # delay to see game over message
             return
 
         pygame.display.update()
-        CLOCK.tick(30)
+        CLOCK.tick(15)
 
 if __name__ == "__main__":
     main()
