@@ -105,7 +105,8 @@ class Food:
         self.randomize_position()
 
     def randomize_position(self):
-        self.position = (random.randint(0, WINDOW_WIDTH // BLOCK_SIZE - 1) * BLOCK_SIZE, random.randint(0, WINDOW_HEIGHT // BLOCK_SIZE - 1) * BLOCK_SIZE)
+        self.position = (random.randint(0, (WINDOW_WIDTH - BLOCK_SIZE) // BLOCK_SIZE - 1) * BLOCK_SIZE,
+                         random.randint(0, (WINDOW_HEIGHT - BLOCK_SIZE) // BLOCK_SIZE - 1) * BLOCK_SIZE)
 
     def draw(self):
         pygame.draw.rect(SCREEN, self.color, pygame.Rect(self.position[0], self.position[1], BLOCK_SIZE, BLOCK_SIZE))
@@ -147,11 +148,10 @@ class QLearningAgent:
         # Update the Q-value
         self.q_table[head_x, head_y, food_x, food_y, direction, action_index] = (1 - self.alpha) * self.q_table[head_x, head_y, food_x, food_y, direction, action_index] + self.alpha * (reward + self.gamma * max_next_q_value)
 
-
     def state_to_index(self, state):
-        # Convert the state into indices that can be used in the Q-table
         head_x, head_y, food_x, food_y, direction = state
-        return head_x // BLOCK_SIZE, head_y // BLOCK_SIZE, food_x // BLOCK_SIZE, food_y // BLOCK_SIZE, direction
+        return min(head_x // BLOCK_SIZE, 20), min(head_y // BLOCK_SIZE, 20), min(food_x // BLOCK_SIZE, 20), min(
+            food_y // BLOCK_SIZE, 20), direction
 
     def index_to_action(self, action_index):
         # Convert the action index to the actual action
@@ -167,51 +167,63 @@ class QLearningAgent:
 
 
 def main():
-     # create snake, food and agent
-    snake = Snake()
-    food = Food()
+    # create agent only once
     agent = QLearningAgent()
 
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                return
+    # start the learning loop
+    for episode in range(500):   # replace NUM_EPISODES with desired number of learning episodes
 
-        old_state = snake.get_state(food)
-        action = agent.get_action(old_state)
-        snake.turn(action)
-        snake.move()
+        # reset the game state
+        snake = Snake()
+        food = Food()
 
-        SCREEN.fill(WHITE)
+        episode = 0
+        while True:
+            episode += 1
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    return
 
-        snake.draw()
-        food.draw()
+            old_state = snake.get_state(food)
+            action = agent.get_action(old_state)
+            snake.turn(action)
+            snake.move()
 
-        food_eaten = snake.get_head_position() == food.position
-        game_over = snake.is_collision()
+            SCREEN.fill(WHITE)
 
-        reward = snake.get_reward(food_eaten, game_over)
-        snake.update_score(reward)
+            snake.draw()
+            food.draw()
 
-        if food_eaten:
-            snake.length += 1
-            food.randomize_position()
+            food_eaten = snake.get_head_position() == food.position
+            game_over = Snake.is_collision(snake)
 
-        if game_over:
-            text = FONT.render("Game Over", True, BLACK)
-            SCREEN.blit(text,
-                        (WINDOW_WIDTH // 2 - text.get_width() // 2, WINDOW_HEIGHT // 2 - text.get_height() // 2))
+            reward = snake.get_reward(food_eaten, game_over)
+            snake.update_score(reward)
+
+            if food_eaten:
+                snake.length += 1
+                food.randomize_position()
+
+            if game_over:
+                episode += 1 # Increase the episode counter
+                if episode % 10 == 0: # print every 100 episodes
+                    print(f'Episode {episode}, Score: {snake.score}')
+                    # Reset score after logging
+                snake.score = 0
+
+                text = FONT.render("Game Over", True, BLACK)
+                SCREEN.blit(text,
+                            (WINDOW_WIDTH // 2 - text.get_width() // 2, WINDOW_HEIGHT // 2 - text.get_height() // 2))
+                pygame.display.update()
+                pygame.time.wait(1)  # delay to see game over message
+                break
+
+            new_state = snake.get_state(food)
+            agent.update_q_table(old_state, action, reward, new_state)
+
             pygame.display.update()
-            pygame.time.wait(200)  # delay to see game over message
-            return
-
-        new_state = snake.get_state(food)
-        agent.update_q_table(old_state, action, reward, new_state)
-
-        pygame.display.update()
-        CLOCK.tick(15)
-
+            CLOCK.tick(240)
 
 
 if __name__ == "__main__":
