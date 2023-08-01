@@ -192,7 +192,7 @@ def main():
         print("No Q-table found. Starting from scratch.")
 
     # start the learning loop
-    for episode in range(10000):   # replace NUM_EPISODES with desired number of learning episodes
+    for episode in range(1000):   # replace NUM_EPISODES with desired number of learning episodes
 
         # reset the game state
         snake = Snake()
@@ -236,18 +236,18 @@ def main():
                 #     num_food_eaten += 1
                 # else: print ("Something went wrong")
 
-                text = FONT.render("Game Over", True, BLACK)
-                SCREEN.blit(text,
-                            (WINDOW_WIDTH // 2 - text.get_width() // 2, WINDOW_HEIGHT // 2 - text.get_height() // 2))
-                pygame.display.update()
-                pygame.time.wait(1)  # delay to see game over message
+                # text = FONT.render("Game Over", True, BLACK)
+                # SCREEN.blit(text,
+                #             (WINDOW_WIDTH // 2 - text.get_width() // 2, WINDOW_HEIGHT // 2 - text.get_height() // 2))
+                # pygame.display.update()
+                # pygame.time.wait(1)  # delay to see game over message
                 break
 
             new_state = snake.get_state(food)
             agent.update_q_table(old_state, action, reward, new_state)
 
             pygame.display.update()
-            CLOCK.tick(1500)
+            CLOCK.tick(2000)
 
     try:
         agent.save_q_table("q_table.pkl")
