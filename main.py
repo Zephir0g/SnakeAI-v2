@@ -91,11 +91,11 @@ class Snake:
 
     def get_reward(self, food_eaten, game_over):
         if game_over:
-            return -1
+            return -100  # Big negative reward if the game is over
         elif food_eaten:
-            return 10
+            return 100  # Big positive reward if the snake eats the food
         else:
-            return 0
+            return -1  # negative reward for every action that doesn't lead to food
 
     def update_score(self, reward):
         self.score += reward
