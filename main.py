@@ -177,9 +177,7 @@ def main():
         snake = Snake()
         food = Food()
 
-        episode = 0
         while True:
-            episode += 1
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
@@ -206,10 +204,9 @@ def main():
                 food.randomize_position()
 
             if game_over:
-                episode += 1 # Increase the episode counter
-                if episode % 10 == 0: # print every 100 episodes
+                if episode % 10 == 0: # print every 10 episodes
                     print(f'Episode {episode}, Score: {snake.score}')
-                    # Reset score after logging
+                # Reset score after logging
                 snake.score = 0
 
                 text = FONT.render("Game Over", True, BLACK)
