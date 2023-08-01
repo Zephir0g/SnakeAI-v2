@@ -93,7 +93,7 @@ class Snake:
         if game_over:
             return -1
         elif food_eaten:
-            return 1
+            return 10
         else:
             return 0
 
@@ -181,8 +181,18 @@ def main():
     agent = QLearningAgent()
     scores = []  # list to store scores
 
+    # Counters for failures and eaten food
+    # num_failures = 0
+    # num_food_eaten = 0
+
+    try:
+        agent.load_q_table("q_table.pkl")
+        print("Lesssssssgo!!!")
+    except FileNotFoundError:
+        print("No Q-table found. Starting from scratch.")
+
     # start the learning loop
-    for episode in range(5000):   # replace NUM_EPISODES with desired number of learning episodes
+    for episode in range(10000):   # replace NUM_EPISODES with desired number of learning episodes
 
         # reset the game state
         snake = Snake()
@@ -199,7 +209,7 @@ def main():
             snake.turn(action)
             snake.move()
 
-            SCREEN.fill(WHITE)
+            SCREEN.fill(BLACK)
 
             snake.draw()
             food.draw()
@@ -220,6 +230,12 @@ def main():
                 scores.append(snake.score)  # append the score
                 snake.score = 0
 
+                # if game_over:
+                #     num_failures += 1
+                # elif food_eaten:
+                #     num_food_eaten += 1
+                # else: print ("Something went wrong")
+
                 text = FONT.render("Game Over", True, BLACK)
                 SCREEN.blit(text,
                             (WINDOW_WIDTH // 2 - text.get_width() // 2, WINDOW_HEIGHT // 2 - text.get_height() // 2))
@@ -231,7 +247,15 @@ def main():
             agent.update_q_table(old_state, action, reward, new_state)
 
             pygame.display.update()
-            CLOCK.tick(500)
+            CLOCK.tick(1500)
+
+    try:
+        agent.save_q_table("q_table.pkl")
+        print("Saved!")
+    except FileNotFoundError:
+        print("Not saved :(")
+
+
 
     # After the training loop
     plt.plot(scores)
@@ -240,6 +264,9 @@ def main():
     plt.ylabel('Score')
     plt.show()
 
+    # Output the counters for failures and eaten food
+    # print(f'Number of failures: {num_failures}')
+    # print(f'Number of food eaten: {num_food_eaten}')
 
 if __name__ == "__main__":
     main()
