@@ -114,12 +114,18 @@ class Food:
         pygame.draw.rect(SCREEN, self.color, pygame.Rect(self.position[0], self.position[1], BLOCK_SIZE, BLOCK_SIZE))
 
 class QLearningAgent:
-    def __init__(self, alpha=0.5, gamma=0.9, epsilon=0.1, batch_size=100):
+    def __init__(self, alpha=0.5, gamma=0.9, epsilon=1.0, epsilon_decay=0.995, epsilon_min=0.01, batch_size=100):
         self.alpha = alpha  # Learning rate
         self.gamma = gamma  # Discount factor
         self.epsilon = epsilon  # Exploration factor
+        self.epsilon_decay = epsilon_decay
+        self.epsilon_min = epsilon_min
         self.batch_size = batch_size
         self.history = []
+
+        def decay_epsilon(self):
+            if self.epsilon > self.epsilon_min:
+                self.epsilon *= self.epsilon_decay
 
         # Initialize Q-table to zeros. For simplicity, we consider
         # the state as the difference in x and y (each ranging from -10 to 10)
