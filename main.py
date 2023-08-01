@@ -1,5 +1,6 @@
 import pygame
 import random
+import numpy as np
 
 # define some colors
 WHITE = (255, 255, 255)
@@ -103,6 +104,62 @@ class Food:
 
     def draw(self):
         pygame.draw.rect(SCREEN, self.color, pygame.Rect(self.position[0], self.position[1], BLOCK_SIZE, BLOCK_SIZE))
+
+
+class QLearningAgent:
+    def __init__(self, alpha=0.5, gamma=0.9, epsilon=0.1):
+        self.alpha = alpha  # Learning rate
+        self.gamma = gamma  # Discount factor
+        self.epsilon = epsilon  # Exploration factor
+
+        # Initialize Q-table to zeros. For simplicity, we consider
+        # the state as the difference in x and y (each ranging from -10 to 10)
+        # between the snake and the food, and the current direction of the snake.
+        self.q_table = np.zeros((21, 21, 4, 4))
+
+        # Define the action index mapping
+        self.action_index_mapping = {
+            pygame.K_UP: 0,
+            pygame.K_DOWN: 1,
+            pygame.K_LEFT: 2,
+            pygame.K_RIGHT: 3,
+        }
+
+    def get_max_q_value_action(self, state):
+        x, y, direction = self.state_to_index(state)
+
+        # Get the action that has the maximum Q-value
+        max_q_value_action_index = np.argmax(self.q_table[x, y, direction])
+        return self.index_to_action(max_q_value_action_index)
+
+    def update_q_table(self, state, action, reward, next_state):
+        x, y, direction = self.state_to_index(state)
+        action_index = self.action_index_mapping[action]
+
+        # Get the maximum Q-value for the next state
+        next_x, next_y, next_direction = self.state_to_index(next_state)
+        max_next_q_value = np.max(self.q_table[next_x, next_y, next_direction])
+
+        # Update the Q-value
+        self.q_table[x, y, direction, action_index] = (1 - self.alpha) * self.q_table[x, y, direction, action_index] + \
+            self.alpha * (reward + self.gamma * max_next_q_value)
+
+    def state_to_index(self, state):
+        # Convert the state into indices that can be used in the Q-table
+        x, y = state[0] + 10, state[1] + 10
+        direction = sum(i * v for i, v in enumerate(state[2:]))
+        return int(x), int(y), int(direction)
+
+    def index_to_action(self, action_index):
+        # Convert the action index to the actual action
+        return self.action_index_mapping.keys()[action_index]
+
+    def get_action(self, state):
+        # Choose action according to the epsilon-greedy policy
+        if np.random.rand() < self.epsilon:
+            return random.choice(Snake.ACTIONS)
+        else:
+            return self.get_max_q_value_action(state)
 
 def is_collision(snake):
     head_x, head_y = snake.get_head_position()
