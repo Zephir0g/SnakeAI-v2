@@ -5,6 +5,11 @@ import os
 import pickle
 import matplotlib.pyplot as plt
 
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.optimizers import Adam
+from collections import deque
+
 # define some colors
 WHITE = (255, 255, 255)
 GREEN = (0, 255, 0)
@@ -26,7 +31,7 @@ FONT = pygame.font.Font(None, 50)
 
 class Snake:
     # define actions
-    ACTIONS = [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT]
+    ACTIONS = [0, 1, 2, 3]
 
     def __init__(self):
         self.length = 3
@@ -40,22 +45,23 @@ class Snake:
 
     def turn(self, new_direction):
         # Don't allow the snake to move in the opposite direction instantaneously
-        opposing_directions = [(pygame.K_UP, pygame.K_DOWN), (pygame.K_DOWN, pygame.K_UP), (pygame.K_LEFT, pygame.K_RIGHT), (pygame.K_RIGHT, pygame.K_LEFT)]
+        opposing_directions = [(0, 1), (1, 0), (2, 3), (3, 2)]
         for direction in opposing_directions:
-            if (new_direction == direction[0] and self.direction == direction[1]) or (new_direction == direction[1] and self.direction == direction[0]):
+            if (new_direction == direction[0] and self.direction == direction[1]) or (
+                    new_direction == direction[1] and self.direction == direction[0]):
                 return
 
         self.direction = new_direction
 
     def move(self):
         cur = self.get_head_position()
-        if self.direction == pygame.K_UP:
+        if self.direction == 0:  # previously pygame.K_UP
             new_pos = (cur[0], cur[1] - BLOCK_SIZE)
-        elif self.direction == pygame.K_DOWN:
+        elif self.direction == 1:  # previously pygame.K_DOWN
             new_pos = (cur[0], cur[1] + BLOCK_SIZE)
-        elif self.direction == pygame.K_LEFT:
+        elif self.direction == 2:  # previously pygame.K_LEFT
             new_pos = (cur[0] - BLOCK_SIZE, cur[1])
-        else:
+        else:  # previously pygame.K_RIGHT
             new_pos = (cur[0] + BLOCK_SIZE, cur[1])
 
         if len(self.positions) > self.length:
@@ -113,112 +119,78 @@ class Food:
     def draw(self):
         pygame.draw.rect(SCREEN, self.color, pygame.Rect(self.position[0], self.position[1], BLOCK_SIZE, BLOCK_SIZE))
 
-class QLearningAgent:
-    def __init__(self, alpha=0.5, gamma=0.9, epsilon=1.0, epsilon_decay=0.995, epsilon_min=0.01, batch_size=100):
-        self.alpha = alpha  # Learning rate
-        self.gamma = gamma  # Discount factor
-        self.epsilon = epsilon  # Exploration factor
-        self.epsilon_decay = epsilon_decay
-        self.epsilon_min = epsilon_min
-        self.batch_size = batch_size
-        self.history = []
+class DQNAgent:
+    def __init__(self, state_size, action_size):
+        self.state_size = state_size
+        self.action_size = action_size
+        self.memory = deque(maxlen=2000)
+        self.gamma = 0.95  # discount rate
+        self.epsilon = 1.0  # exploration rate
+        self.epsilon_min = 0.01
+        self.epsilon_decay = 0.995
+        self.learning_rate = 0.001
+        self.model = self._build_model()
 
-        def decay_epsilon(self):
-            if self.epsilon > self.epsilon_min:
-                self.epsilon *= self.epsilon_decay
+    def _build_model(self):
+        # Neural Net for Deep-Q learning Model
+        model = Sequential()
+        model.add(Dense(24, input_dim=self.state_size, activation='relu'))
+        model.add(Dense(24, activation='relu'))
+        model.add(Dense(self.action_size, activation='linear'))
+        model.compile(loss='mse',
+                      optimizer=Adam(learning_rate=self.learning_rate))
+        return model
 
-        # Initialize Q-table to zeros. For simplicity, we consider
-        # the state as the difference in x and y (each ranging from -10 to 10)
-        # between the snake and the food, and the current direction of the snake.
-        self.q_table = np.zeros((21, 21, 21, 21, 4, 4))
+    def remember(self, state, action, reward, next_state, done):
+        self.memory.append((state, action, reward, next_state, done))
 
-        # Define the action index mapping
-        self.action_index_mapping = {
-            pygame.K_UP: 0,
-            pygame.K_DOWN: 1,
-            pygame.K_LEFT: 2,
-            pygame.K_RIGHT: 3,
-        }
+    def act(self, state):
+        if np.random.rand() <= self.epsilon:
+            return random.randrange(self.action_size)
+        act_values = self.model.predict(state)
+        return np.argmax(act_values[0])  # returns action
 
-    def get_max_q_value_action(self, state):
-        head_x, head_y, food_x, food_y, direction = self.state_to_index(state)
+    def replay(self, batch_size):
+        minibatch = random.sample(self.memory, batch_size)
+        for state, action, reward, next_state, done in minibatch:
+            target = reward
+            if not done:
+                target = (reward + self.gamma *
+                          np.amax(self.model.predict(next_state)[0]))
+            target_f = self.model.predict(state)
+            target_f[0][action] = target
+            self.model.fit(state, target_f, epochs=1, verbose=0)
+        if self.epsilon > self.epsilon_min:
+            self.epsilon *= self.epsilon_decay
 
-        # Get the action that has the maximum Q-value
-        max_q_value_action_index = np.argmax(self.q_table[head_x, head_y, food_x, food_y, direction])
-        return self.index_to_action(max_q_value_action_index)
+    def save_model(self, file_name):
+        self.model.save_weights(file_name)
 
-    def update_q_table(self, state, action, reward, next_state):
-        head_x, head_y, food_x, food_y, direction = self.state_to_index(state)
-        action_index = self.action_index_mapping[action]
-
-        # Get the maximum Q-value for the next state
-        next_head_x, next_head_y, next_food_x, next_food_y, next_direction = self.state_to_index(next_state)
-        max_next_q_value = np.max(self.q_table[next_head_x, next_head_y, next_food_x, next_food_y, next_direction])
-
-        # Update the Q-value
-        self.q_table[head_x, head_y, food_x, food_y, direction, action_index] = (1 - self.alpha) * self.q_table[head_x, head_y, food_x, food_y, direction, action_index] + self.alpha * (reward + self.gamma * max_next_q_value)
-
-    def state_to_index(self, state):
-        head_x, head_y, food_x, food_y, direction = state
-        return min(head_x // BLOCK_SIZE, 20), min(head_y // BLOCK_SIZE, 20), min(food_x // BLOCK_SIZE, 20), min(
-            food_y // BLOCK_SIZE, 20), direction
-
-    def index_to_action(self, action_index):
-        # Convert the action index to the actual action
-        return list(self.action_index_mapping.keys())[action_index]
-
-    def get_action(self, state):
-        # Choose action according to the epsilon-greedy policy
-        if np.random.rand() < self.epsilon:
-            return random.choice(Snake.ACTIONS)
-        else:
-            return self.get_max_q_value_action(state)
-
-    def save_q_table(self, file_name):
-        with open(file_name, 'wb') as f:
-            pickle.dump(self.q_table, f)
-
-    def load_q_table(self, file_name):
-        with open(file_name, 'rb') as f:
-            self.q_table = pickle.load(f)
-
-    def add_to_history(self, state, action, reward, next_state):
-        self.history.append((state, action, reward, next_state))
-        if len(self.history) >= self.batch_size:
-            self.update_q_table_from_history()
-
-    def update_q_table_from_history(self):
-        for state, action, reward, next_state in self.history:
-            self.update_q_table(state, action, reward, next_state)
-        self.history = []
+    def load_model(self, file_name):
+        self.model.load_weights(file_name)
 
 
 
 def main():
     # create agent only once
-    agent = QLearningAgent(alpha=0.5, gamma=0.9, epsilon=1.0, epsilon_decay=0.995, epsilon_min=0.01)
+    agent = DQNAgent(5, 4)  # 4 possible directions
     scores = []  # list to store scores
     max_score = -np.inf  # Initialize maximum score to negative infinity
 
-    # Counters for failures and eaten food
-    # num_failures = 0
-    # num_food_eaten = 0
-
     try:
-        agent.load_q_table("q_table.pkl")
+        agent.load_model("deep_learn_database/dqn_model.h5")
         print("Lesssssssgo!!!")
     except FileNotFoundError:
-        print("No Q-table found. Starting from scratch.")
+        print("No model found. Starting from scratch.")
 
-    # test best model
     # try:
-    #     agent.load_q_table("best_q_table.pkl")
-    #     print("Loaded the best model!")
+    #     agent.load_model("deep_learn_database/best_dqn_model.h5")
+    #     print("Lesssssssgo with only best!!!")
     # except FileNotFoundError:
-    #     print("No best Q-table found.")
+    #     print("No model found.")
 
     # start the learning loop
-    for episode in range(500):   # replace NUM_EPISODES with desired number of learning episodes
+    for episode in range(10000):   # replace NUM_EPISODES with desired number of learning episodes
 
         # reset the game state
         snake = Snake()
@@ -231,7 +203,7 @@ def main():
                     return
 
             old_state = snake.get_state(food)
-            action = agent.get_action(old_state)
+            action = agent.act(old_state)
             snake.turn(action)
             snake.move()
 
@@ -252,7 +224,7 @@ def main():
 
             if snake.score > max_score:
                 max_score = snake.score
-                agent.save_q_table("best_q_table.pkl")
+                agent.save_model("deep_learn_database/best_dqn_model.h5")
 
             if game_over:
                 if episode % 10 == 0:  # print every 10 episodes
@@ -262,15 +234,15 @@ def main():
                 break
 
             new_state = snake.get_state(food)
-            agent.add_to_history(old_state, action, reward, new_state)
+            agent.remember(old_state, action, reward, new_state, game_over)
 
             pygame.display.update()
-            CLOCK.tick(200)
+            CLOCK.tick(1000)
 
         agent.epsilon_decay *= agent.epsilon_decay
 
     try:
-        agent.save_q_table("q_table.pkl")
+        agent.save_model("deep_learn_database/dqn_model.h5")
         print("Saved!")
     except FileNotFoundError:
         print("Not saved :(")
@@ -284,9 +256,6 @@ def main():
     plt.ylabel('Score')
     plt.show()
 
-    # Output the counters for failures and eaten food
-    # print(f'Number of failures: {num_failures}')
-    # print(f'Number of food eaten: {num_food_eaten}')
 
 if __name__ == "__main__":
     main()
