@@ -114,10 +114,12 @@ class Food:
         pygame.draw.rect(SCREEN, self.color, pygame.Rect(self.position[0], self.position[1], BLOCK_SIZE, BLOCK_SIZE))
 
 class QLearningAgent:
-    def __init__(self, alpha=0.5, gamma=0.9, epsilon=0.1):
+    def __init__(self, alpha=0.5, gamma=0.9, epsilon=0.1, batch_size=100):
         self.alpha = alpha  # Learning rate
         self.gamma = gamma  # Discount factor
         self.epsilon = epsilon  # Exploration factor
+        self.batch_size = batch_size
+        self.history = []
 
         # Initialize Q-table to zeros. For simplicity, we consider
         # the state as the difference in x and y (each ranging from -10 to 10)
@@ -174,6 +176,16 @@ class QLearningAgent:
         with open(file_name, 'rb') as f:
             self.q_table = pickle.load(f)
 
+    def add_to_history(self, state, action, reward, next_state):
+        self.history.append((state, action, reward, next_state))
+        if len(self.history) >= self.batch_size:
+            self.update_q_table_from_history()
+
+    def update_q_table_from_history(self):
+        for state, action, reward, next_state in self.history:
+            self.update_q_table(state, action, reward, next_state)
+        self.history = []
+
 
 
 def main():
@@ -192,7 +204,7 @@ def main():
         print("No Q-table found. Starting from scratch.")
 
     # start the learning loop
-    for episode in range(1000):   # replace NUM_EPISODES with desired number of learning episodes
+    for episode in range(50):   # replace NUM_EPISODES with desired number of learning episodes
 
         # reset the game state
         snake = Snake()
@@ -224,30 +236,21 @@ def main():
                 snake.length += 1
                 food.randomize_position()
 
+            new_state = snake.get_state(food)
+
+            agent.add_to_history(old_state, action, reward, new_state)
+
             if game_over:
-                if episode % 100 == 0: # print every 100 episodes
+                if episode % 100 == 0:  # print every 100 episodes
                     print(f'Episode {episode}, Score: {snake.score}')
                 scores.append(snake.score)  # append the score
                 snake.score = 0
-
-                # if game_over:
-                #     num_failures += 1
-                # elif food_eaten:
-                #     num_food_eaten += 1
-                # else: print ("Something went wrong")
-
-                # text = FONT.render("Game Over", True, BLACK)
-                # SCREEN.blit(text,
-                #             (WINDOW_WIDTH // 2 - text.get_width() // 2, WINDOW_HEIGHT // 2 - text.get_height() // 2))
-                # pygame.display.update()
-                # pygame.time.wait(1)  # delay to see game over message
                 break
 
-            new_state = snake.get_state(food)
-            agent.update_q_table(old_state, action, reward, new_state)
+            agent.update_q_table_from_history()
 
             pygame.display.update()
-            CLOCK.tick(2000)
+            CLOCK.tick(50)
 
     try:
         agent.save_q_table("q_table.pkl")
