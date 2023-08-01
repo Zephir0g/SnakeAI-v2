@@ -1,6 +1,7 @@
 import pygame
 import random
 import numpy as np
+import os
 
 # define some colors
 WHITE = (255, 255, 255)
@@ -69,18 +70,22 @@ class Snake:
         food_x, food_y = food.position
 
         state = [
-            # Distance to the food in x and y directions
-            food_x - head_x,
-            food_y - head_y,
+            # Position of the snake's head and the food
+            head_x,
+            head_y,
+            food_x,
+            food_y,
 
             # Current direction of the snake
-            self.direction == pygame.K_UP,
-            self.direction == pygame.K_DOWN,
-            self.direction == pygame.K_LEFT,
-            self.direction == pygame.K_RIGHT,
+            self.ACTIONS.index(self.direction)
         ]
 
         return state
+
+    def is_collision(snake):
+        head_x, head_y = snake.get_head_position()
+        return (head_x < 0 or head_y < 0 or head_x >= WINDOW_WIDTH or head_y >= WINDOW_HEIGHT or
+                (snake.get_head_position() in snake.positions[1:]))
 
     def get_reward(self, food_eaten, game_over):
         if game_over:
@@ -105,7 +110,6 @@ class Food:
     def draw(self):
         pygame.draw.rect(SCREEN, self.color, pygame.Rect(self.position[0], self.position[1], BLOCK_SIZE, BLOCK_SIZE))
 
-
 class QLearningAgent:
     def __init__(self, alpha=0.5, gamma=0.9, epsilon=0.1):
         self.alpha = alpha  # Learning rate
@@ -115,7 +119,7 @@ class QLearningAgent:
         # Initialize Q-table to zeros. For simplicity, we consider
         # the state as the difference in x and y (each ranging from -10 to 10)
         # between the snake and the food, and the current direction of the snake.
-        self.q_table = np.zeros((21, 21, 4, 4))
+        self.q_table = np.zeros((21, 21, 21, 21, 4, 4))
 
         # Define the action index mapping
         self.action_index_mapping = {
@@ -126,33 +130,32 @@ class QLearningAgent:
         }
 
     def get_max_q_value_action(self, state):
-        x, y, direction = self.state_to_index(state)
+        head_x, head_y, food_x, food_y, direction = self.state_to_index(state)
 
         # Get the action that has the maximum Q-value
-        max_q_value_action_index = np.argmax(self.q_table[x, y, direction])
+        max_q_value_action_index = np.argmax(self.q_table[head_x, head_y, food_x, food_y, direction])
         return self.index_to_action(max_q_value_action_index)
 
     def update_q_table(self, state, action, reward, next_state):
-        x, y, direction = self.state_to_index(state)
+        head_x, head_y, food_x, food_y, direction = self.state_to_index(state)
         action_index = self.action_index_mapping[action]
 
         # Get the maximum Q-value for the next state
-        next_x, next_y, next_direction = self.state_to_index(next_state)
-        max_next_q_value = np.max(self.q_table[next_x, next_y, next_direction])
+        next_head_x, next_head_y, next_food_x, next_food_y, next_direction = self.state_to_index(next_state)
+        max_next_q_value = np.max(self.q_table[next_head_x, next_head_y, next_food_x, next_food_y, next_direction])
 
         # Update the Q-value
-        self.q_table[x, y, direction, action_index] = (1 - self.alpha) * self.q_table[x, y, direction, action_index] + \
-            self.alpha * (reward + self.gamma * max_next_q_value)
+        self.q_table[head_x, head_y, food_x, food_y, direction, action_index] = (1 - self.alpha) * self.q_table[head_x, head_y, food_x, food_y, direction, action_index] + self.alpha * (reward + self.gamma * max_next_q_value)
+
 
     def state_to_index(self, state):
         # Convert the state into indices that can be used in the Q-table
-        x, y = state[0] + 10, state[1] + 10
-        direction = sum(i * v for i, v in enumerate(state[2:]))
-        return int(x), int(y), int(direction)
+        head_x, head_y, food_x, food_y, direction = state
+        return head_x // BLOCK_SIZE, head_y // BLOCK_SIZE, food_x // BLOCK_SIZE, food_y // BLOCK_SIZE, direction
 
     def index_to_action(self, action_index):
         # Convert the action index to the actual action
-        return self.action_index_mapping.keys()[action_index]
+        return list(self.action_index_mapping.keys())[action_index]
 
     def get_action(self, state):
         # Choose action according to the epsilon-greedy policy
@@ -161,23 +164,23 @@ class QLearningAgent:
         else:
             return self.get_max_q_value_action(state)
 
-def is_collision(snake):
-    head_x, head_y = snake.get_head_position()
-    return (head_x < 0 or head_y < 0 or head_x >= WINDOW_WIDTH or head_y >= WINDOW_HEIGHT or
-            (snake.get_head_position() in snake.positions[1:]))
+
 
 def main():
+     # create snake, food and agent
     snake = Snake()
     food = Food()
+    agent = QLearningAgent()
 
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 return
-            elif event.type == pygame.KEYDOWN:
-                snake.turn(event.key)
 
+        old_state = snake.get_state(food)
+        action = agent.get_action(old_state)
+        snake.turn(action)
         snake.move()
 
         SCREEN.fill(WHITE)
@@ -185,19 +188,31 @@ def main():
         snake.draw()
         food.draw()
 
-        if snake.get_head_position() == food.position:
+        food_eaten = snake.get_head_position() == food.position
+        game_over = snake.is_collision()
+
+        reward = snake.get_reward(food_eaten, game_over)
+        snake.update_score(reward)
+
+        if food_eaten:
             snake.length += 1
             food.randomize_position()
 
-        if is_collision(snake):
+        if game_over:
             text = FONT.render("Game Over", True, BLACK)
-            SCREEN.blit(text, (WINDOW_WIDTH//2 - text.get_width()//2, WINDOW_HEIGHT//2 - text.get_height()//2))
+            SCREEN.blit(text,
+                        (WINDOW_WIDTH // 2 - text.get_width() // 2, WINDOW_HEIGHT // 2 - text.get_height() // 2))
             pygame.display.update()
             pygame.time.wait(200)  # delay to see game over message
             return
 
+        new_state = snake.get_state(food)
+        agent.update_q_table(old_state, action, reward, new_state)
+
         pygame.display.update()
         CLOCK.tick(15)
+
+
 
 if __name__ == "__main__":
     main()
