@@ -21,11 +21,15 @@ SCREEN = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 FONT = pygame.font.Font(None, 50)
 
 class Snake:
+    # define actions
+    ACTIONS = [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT]
+
     def __init__(self):
         self.length = 3
         self.positions = [((WINDOW_WIDTH // 2), (WINDOW_HEIGHT // 2))]
-        self.direction = random.choice([pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT])
+        self.direction = random.choice(self.ACTIONS)
         self.color = GREEN
+        self.score = 0
 
     def get_head_position(self):
         return self.positions[0]
@@ -58,6 +62,35 @@ class Snake:
     def draw(self):
         for p in self.positions:
             pygame.draw.rect(SCREEN, self.color, pygame.Rect(p[0], p[1], BLOCK_SIZE, BLOCK_SIZE))
+
+    def get_state(self, food):
+        head_x, head_y = self.get_head_position()
+        food_x, food_y = food.position
+
+        state = [
+            # Distance to the food in x and y directions
+            food_x - head_x,
+            food_y - head_y,
+
+            # Current direction of the snake
+            self.direction == pygame.K_UP,
+            self.direction == pygame.K_DOWN,
+            self.direction == pygame.K_LEFT,
+            self.direction == pygame.K_RIGHT,
+        ]
+
+        return state
+
+    def get_reward(self, food_eaten, game_over):
+        if game_over:
+            return -1
+        elif food_eaten:
+            return 1
+        else:
+            return 0
+
+    def update_score(self, reward):
+        self.score += reward
 
 class Food:
     def __init__(self):
