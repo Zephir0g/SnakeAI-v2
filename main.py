@@ -2,6 +2,7 @@ import pygame
 import random
 import numpy as np
 import os
+import pickle
 
 # define some colors
 WHITE = (255, 255, 255)
@@ -164,11 +165,29 @@ class QLearningAgent:
         else:
             return self.get_max_q_value_action(state)
 
+    def save_q_table(self, file_name):
+        with open(file_name, 'wb') as f:
+            pickle.dump(self.q_table, f)
+
+    def load_q_table(self, file_name):
+        with open(file_name, 'rb') as f:
+            self.q_table = pickle.load(f)
+
 
 
 def main():
     # create agent only once
     agent = QLearningAgent()
+
+
+    # If you save the Q-table after each training and load it before starting,
+    # the next training, your agent will continue learning from where it left off last time.
+    # This means that over time, the agent will "learn" more and more from each new game experience.
+    try:
+        print("Q-table found. Starting...")
+        agent.load_q_table("q_table.pkl")
+    except FileNotFoundError:
+        print("No Q-table found. Starting from scratch.")
 
     # start the learning loop
     for episode in range(500):   # replace NUM_EPISODES with desired number of learning episodes
@@ -221,6 +240,8 @@ def main():
 
             pygame.display.update()
             CLOCK.tick(240)
+
+    agent.save_q_table("q_table.pkl")
 
 
 if __name__ == "__main__":
