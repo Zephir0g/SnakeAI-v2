@@ -196,8 +196,9 @@ class QLearningAgent:
 
 def main():
     # create agent only once
-    agent = QLearningAgent()
+    agent = QLearningAgent(alpha=0.5, gamma=0.9, epsilon=1.0, epsilon_decay=0.995, epsilon_min=0.01)
     scores = []  # list to store scores
+    max_score = -np.inf  # Initialize maximum score to negative infinity
 
     # Counters for failures and eaten food
     # num_failures = 0
@@ -209,8 +210,15 @@ def main():
     except FileNotFoundError:
         print("No Q-table found. Starting from scratch.")
 
+    # test best model
+    # try:
+    #     agent.load_q_table("best_q_table.pkl")
+    #     print("Loaded the best model!")
+    # except FileNotFoundError:
+    #     print("No best Q-table found.")
+
     # start the learning loop
-    for episode in range(50):   # replace NUM_EPISODES with desired number of learning episodes
+    for episode in range(500):   # replace NUM_EPISODES with desired number of learning episodes
 
         # reset the game state
         snake = Snake()
@@ -242,21 +250,24 @@ def main():
                 snake.length += 1
                 food.randomize_position()
 
-            new_state = snake.get_state(food)
-
-            agent.add_to_history(old_state, action, reward, new_state)
+            if snake.score > max_score:
+                max_score = snake.score
+                agent.save_q_table("best_q_table.pkl")
 
             if game_over:
-                if episode % 100 == 0:  # print every 100 episodes
-                    print(f'Episode {episode}, Score: {snake.score}')
+                if episode % 10 == 0:  # print every 10 episodes
+                    print(f'Episode {episode}, Score: {snake.score}, Max score: {max_score}')
                 scores.append(snake.score)  # append the score
                 snake.score = 0
                 break
 
-            agent.update_q_table_from_history()
+            new_state = snake.get_state(food)
+            agent.add_to_history(old_state, action, reward, new_state)
 
             pygame.display.update()
-            CLOCK.tick(50)
+            CLOCK.tick(200)
+
+        agent.epsilon_decay *= agent.epsilon_decay
 
     try:
         agent.save_q_table("q_table.pkl")
