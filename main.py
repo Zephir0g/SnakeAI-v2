@@ -190,7 +190,7 @@ def main():
     #     print("No model found.")
 
     # start the learning loop
-    for episode in range(10000):   # replace NUM_EPISODES with desired number of learning episodes
+    for episode in range(50):   # replace NUM_EPISODES with desired number of learning episodes
 
         # reset the game state
         snake = Snake()
